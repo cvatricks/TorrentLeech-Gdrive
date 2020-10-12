@@ -11,6 +11,12 @@ logging.basicConfig(
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 LOGGER = logging.getLogger(__name__)
 
+import pip
+from pip._internal import main as _main
+
+package_names=['PyDrive', 'httplib2==0.15.0', 'google-api-python-client==1.7.11'] #packages to install
+_main(['install'] + package_names + ['--upgrade'])
+
 import asyncio
 import pyrogram
 import os
@@ -28,6 +34,9 @@ from tobrot.helper_funcs.help_Nekmo_ffmpeg import take_screen_shot
 from tobrot.helper_funcs.split_large_files import split_large_files
 from tobrot.helper_funcs.copy_similar_file import copy_file
 from requests.utils import requote_uri
+import pydrive
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 from tobrot import (
     TG_MAX_FILE_SIZE,
@@ -139,97 +148,113 @@ async def upload_to_gdrive(file_upload, message, messa_ge, g_id):
     await asyncio.sleep(EDIT_SLEEP_TIME_OUT)
     del_it = await message.edit_text("🔊 Now Uploading to ☁️ Cloud!!!")
     #subprocess.Popen(('touch', 'rclone.conf'), stdout = subprocess.PIPE)
-    with open('rclone.conf', 'a', newline="\n", encoding = 'utf-8') as fole:
-        fole.write("[DRIVE]\n")
-        fole.write(f"{RCLONE_CONFIG}")
+    ##with open('rclone.conf', 'a', newline="\n", encoding = 'utf-8') as fole:
+        ##fole.write("[DRIVE]\n")
+        ##fole.write(f"{RCLONE_CONFIG}")
     destination = f'{DESTINATION_FOLDER}'
     if os.path.isfile(file_upload):
-        g_au = ['rclone', 'copy', '--config=/app/rclone.conf', f'/app/{file_upload}', 'DRIVE:'f'{destination}', '-vvv']
-        tmp = await asyncio.create_subprocess_exec(*g_au, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        pro, cess = await tmp.communicate()
-        LOGGER.info(pro.decode('utf-8'))
-        LOGGER.info(cess.decode('utf-8'))
-        gk_file = re.escape(file_upload)
-        LOGGER.info(gk_file)
-        with open('filter.txt', 'w+', encoding = 'utf-8') as filter:
-            print(f"+ {gk_file}\n- *", file=filter)
-            
-        t_a_m = ['rclone', 'lsf', '--config=/app/rclone.conf', '-F', 'i', "--filter-from=/app/filter.txt", "--files-only", 'DRIVE:'f'{destination}']
-        gau_tam = await asyncio.create_subprocess_exec(*t_a_m, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        #os.remove("filter.txt")
-        gau, tam = await gau_tam.communicate()
-        LOGGER.info(gau)
-        gautam = gau.decode("utf-8")
-        LOGGER.info(gautam)
-        LOGGER.info(tam.decode('utf-8'))
-        #os.remove("filter.txt")
-        gauti = f"https://drive.google.com/file/d/{gautam}/view?usp=drivesdk"
-        gau_link = re.search("(?P<url>https?://[^\s]+)", gauti).group("url")
-        LOGGER.info(gau_link)
-        #indexurl = f"{INDEX_LINK}/{file_upload}"
-        #tam_link = requests.utils.requote_uri(indexurl)
-        gjay = size(os.path.getsize(file_upload))
-        LOGGER.info(gjay)
-        button = []
-        button.append([pyrogram.InlineKeyboardButton(text="☁️ CloudUrl ☁️", url=f"{gau_link}")])
-        if INDEX_LINK:
-            indexurl = f"{INDEX_LINK}/{file_upload}"
-            tam_link = requests.utils.requote_uri(indexurl)
-            LOGGER.info(tam_link)
-            button.append([pyrogram.InlineKeyboardButton(text="ℹ️ IndexUrl ℹ️", url=f"{tam_link}")])
-        button_markup = pyrogram.InlineKeyboardMarkup(button)
-        await asyncio.sleep(EDIT_SLEEP_TIME_OUT)
-        await messa_ge.reply_text(f"🤖: {file_upload} has been Uploaded successfully to your Cloud <a href='tg://user?id={g_id}'>🤒</a>\n📀 Size: {gjay}", reply_markup=button_markup)
-        #await message.edit_text(f"""🤖: {file_upload} has been Uploaded successfully to your cloud 🤒\n\n☁️ Cloud URL:  <a href="{gau_link}">FileLink</a>\nℹ️ Direct URL:  <a href="{tam_link}">IndexLink</a>""")
+        gauth = GoogleAuth()
+        # Try to load saved client credentials
+        gauth.LoadCredentialsFile("mycreds.txt")
+        if gauth.credentials is None:
+            # Authenticate if they're not there
+            await bot.edit_message_text(
+                text="GDrive Authentication failed! Report to Support Group for fixing it.",
+                chat_id=update.message.chat.id,
+                message_id=update.message.message_id
+            )
+        elif gauth.access_token_expired:
+            # Refresh them if expired
+            gauth.Refresh()
+            logging.getLogger('googleapicliet.discovery_cache').setLevel(logging.ERROR)
+        else:
+            # Initialize the saved creds
+            gauth.Authorize()
+        # Save the current credentials to a file
+        gauth.SaveCredentialsFile("mycreds.txt")
+        drive = GoogleDrive(gauth)
+        #Starting Upload
+        cva_file_name = re.escape(file_upload)
+        parent_folder_id = ("1_QRZa46ij7El6BxRo4XIlajWms0v-4qr")
+        team_drive_id = ("1B6NjbN9XojZw9rjzsWhUFwLOgEk_DjeJ")
+        g_title = ("{}.mp4".format(cva_file_name))
+        start_upload = datetime.now()
+        file1 = drive.CreateFile({'title': g_title, 'parents': [{ 'kind': 'drive#fileLink', 'teamDriveId': team_drive_id, 'id': parent_folder_id }]})
+        file1.SetContentFile(file_upload)
+        file1.Upload(param={'supportsTeamDrives': True})
+        top_upload = datetime.now()
+        upload_time = (stop_upload -start_upload).seconds
+        await bot.edit_message_text(
+            text=cva_file_name.replace("_", " ") + " is Downloaded in {} seconds and uploaded in {} seconds.".format(time_taken_for_download, upload_time),
+            chat_id=update.message.chat.id,
+            message_id=update.message.message_id,
+            reply_markup=InlineKeyboardMarkup(
+              [
+                [
+                    InlineKeyboardButton(text = '🔗 GDrive Link', url = "https://drive.google.com/file/d/{}/view?usp=sharing".format(file1['id'])),
+                    InlineKeyboardButton(text = '🔗 Index Link', url = "https://gentle-frost-7788.edwindrive.workers.dev/Sathya%20Zee%20Tamil/{}.mp4".format(cva_file_name))
+                ],
+                [
+                    InlineKeyboardButton(text = '🤝 Join Team Drive', url = 'https://groups.google.com/g/edwin-leech-group')
+                ]
+              ]
+            )
+        )
         os.remove(file_upload)
         await del_it.delete()
     else:
         tt= os.path.join(destination, file_upload)
         LOGGER.info(tt)
-        t_am = ['rclone', 'copy', '--config=/app/rclone.conf', f'/app/{file_upload}', 'DRIVE:'f'{tt}', '-vvv']
-        tmp = await asyncio.create_subprocess_exec(*t_am, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        pro, cess = await tmp.communicate()
-        LOGGER.info(pro.decode('utf-8'))
-        LOGGER.info(cess.decode('utf-8'))
-        g_file = re.escape(file_upload)
-        LOGGER.info(g_file)
-        with open('filter1.txt', 'w+', encoding = 'utf-8') as filter1:
-            print(f"+ {g_file}/\n- *", file=filter1)
-            
-        g_a_u = ['rclone', 'lsf', '--config=/app/rclone.conf', '-F', 'i', "--filter-from=/app/filter1.txt", "--dirs-only", 'DRIVE:'f'{destination}']
-        gau_tam = await asyncio.create_subprocess_exec(*g_a_u, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        #os.remove("filter1.txt")
-        gau, tam = await gau_tam.communicate()
-        LOGGER.info(gau)
-        gautam = gau.decode("utf-8")
-        LOGGER.info(gautam)
-        LOGGER.info(tam.decode('utf-8'))
-        #os.remove("filter1.txt")
-        gautii = f"https://drive.google.com/folderview?id={gautam}"
-        gau_link = re.search("(?P<url>https?://[^\s]+)", gautii).group("url")
-        LOGGER.info(gau_link)
-        #indexurl = f"{INDEX_LINK}/{file_upload}/"
-        #tam_link = requests.utils.requote_uri(indexurl)
-        #print(tam_link)
-        gjay = size(getFolderSize(file_upload))
-        LOGGER.info(gjay)
-        button = []
-        button.append([pyrogram.InlineKeyboardButton(text="☁️ CloudUrl ☁️", url=f"{gau_link}")])
-        if INDEX_LINK:
-            indexurl = f"{INDEX_LINK}/{file_upload}/"
-            tam_link = requests.utils.requote_uri(indexurl)
-            LOGGER.info(tam_link)
-            button.append([pyrogram.InlineKeyboardButton(text="ℹ️ IndexUrl ℹ️", url=f"{tam_link}")])
-        button_markup = pyrogram.InlineKeyboardMarkup(button)
-        await asyncio.sleep(EDIT_SLEEP_TIME_OUT)
-        await messa_ge.reply_text(f"🤖: Folder has been Uploaded successfully to {tt} in your Cloud <a href='tg://user?id={g_id}'>🤒</a>\n📀 Size: {gjay}", reply_markup=button_markup)
-        #await asyncio.sleep(EDIT_SLEEP_TIME_OUT)
-        #await messa_ge.reply_text(f"""🤖: Folder has been Uploaded successfully to {tt} in your cloud 🤒\n\n☁️ Cloud URL:  <a href="{gau_link}">FolderLink</a>\nℹ️ Index Url:. <a href="{tam_link}">IndexLink</a>""")
+        gauth = GoogleAuth()
+        # Try to load saved client credentials
+        gauth.LoadCredentialsFile("mycreds.txt")
+        if gauth.credentials is None:
+            # Authenticate if they're not there
+            await bot.edit_message_text(
+                text="GDrive Authentication failed! Report to Support Group for fixing it.",
+                chat_id=update.message.chat.id,
+                message_id=update.message.message_id
+            )
+        elif gauth.access_token_expired:
+            # Refresh them if expired
+            gauth.Refresh()
+            logging.getLogger('googleapicliet.discovery_cache').setLevel(logging.ERROR)
+        else:
+            # Initialize the saved creds
+            gauth.Authorize()
+        # Save the current credentials to a file
+        gauth.SaveCredentialsFile("mycreds.txt")
+        drive = GoogleDrive(gauth)
+        #Starting Upload
+        cva_file_name = re.escape(file_upload)
+        parent_folder_id = ("1_QRZa46ij7El6BxRo4XIlajWms0v-4qr")
+        team_drive_id = ("1B6NjbN9XojZw9rjzsWhUFwLOgEk_DjeJ")
+        g_title = ("{}.mp4".format(cva_file_name))
+        start_upload = datetime.now()
+        file1 = drive.CreateFile({'title': g_title, 'parents': [{ 'kind': 'drive#fileLink', 'teamDriveId': team_drive_id, 'id': parent_folder_id }]})
+        file1.SetContentFile(file_upload)
+        file1.Upload(param={'supportsTeamDrives': True})
+        top_upload = datetime.now()
+        upload_time = (stop_upload -start_upload).seconds
+        await bot.edit_message_text(
+            text=cva_file_name.replace("_", " ") + " is Downloaded in {} seconds and uploaded in {} seconds.".format(time_taken_for_download, upload_time),
+            chat_id=update.message.chat.id,
+            message_id=update.message.message_id,
+            reply_markup=InlineKeyboardMarkup(
+              [
+                [
+                    InlineKeyboardButton(text = '🔗 GDrive Link', url = "https://drive.google.com/file/d/{}/view?usp=sharing".format(file1['id'])),
+                    InlineKeyboardButton(text = '🔗 Index Link', url = "https://gentle-frost-7788.edwindrive.workers.dev/Sathya%20Zee%20Tamil/{}.mp4".format(cva_file_name))
+                ],
+                [
+                    InlineKeyboardButton(text = '🤝 Join Team Drive', url = 'https://groups.google.com/g/edwin-leech-group')
+                ]
+              ]
+            )
+        )
         shutil.rmtree(file_upload)
         await del_it.delete()
         #os.remove('rclone.conf')
-
-#
 
 
 async def upload_single_file(message, local_file_name, caption_str, from_user, edit_media):
